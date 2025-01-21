@@ -491,8 +491,8 @@ function ChatRoute() {
                 {isLoading && <LoadingMessage />}
                 {messages.length === 0 && !isLoading && (
                   <div className="text-center py-20">
-                    <h2 className="text-2xl font-semibold mb-2 bg-gradient-to-r from-orange-500 to-red-600 text-transparent bg-clip-text">Ready to Chat?</h2>
-                    <p className="text-gray-400">
+                    <h2 className="text-6xl font-semibold mb-2 bg-gradient-to-r from-orange-500 to-red-600 text-transparent bg-clip-text">Ready to Chat?</h2>
+                    <p className="text-gray-400 text-xl">
                       Start a conversation below. Don't worry, our AI is mostly harmless... mostly 😈
                     </p>
                   </div>
@@ -539,10 +539,11 @@ function ChatRoute() {
         ) : (
           <div className="flex-1 flex items-center justify-center px-4">
             <div className="text-center max-w-3xl mx-auto w-full">
-              <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-orange-500 to-red-600 text-transparent bg-clip-text">Welcome to TanChat</h2>
-              <p className="text-gray-400 mb-6">
-                Your AI pair programming companion. 🚀<br/>
-                Type your message below to start a new chat.
+            <h1 className="text-6xl font-bold mb-4 bg-gradient-to-r from-orange-500 to-red-600 text-transparent bg-clip-text uppercase">
+            <span className="text-white">TanStack</span> Chat
+          </h1>
+              <p className="text-gray-400 mb-6 w-2/3 mx-auto text-lg">
+               You can ask me about anything, I might or might not have a good answer, but you can still ask.
               </p>
               <form onSubmit={handleSubmit}>
                 <div className="relative max-w-xl mx-auto">
@@ -553,7 +554,7 @@ function ChatRoute() {
                     className="w-full rounded-lg border border-orange-500/20 bg-gray-800/50 pl-4 pr-12 py-3 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-transparent resize-none overflow-hidden"
                     disabled={isLoading}
                     rows={1}
-                    style={{ minHeight: '44px', maxHeight: '200px' }}
+                    style={{ minHeight: '88px', maxHeight: '200px' }}
                     onInput={(e) => {
                       const target = e.target as HTMLTextAreaElement;
                       target.style.height = 'auto';

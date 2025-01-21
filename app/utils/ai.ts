@@ -23,7 +23,7 @@ export const genAIResponse = createServerFn({ method: 'GET' })
         const response = await anthropic.messages.create({
             model: "claude-3-5-sonnet-20241022",
             max_tokens: 8192,
-            system: `You are TanChat, an AI assistant using Markdown for clear and structured responses. Format your responses following these guidelines:
+            system: `You are TanStack Chat, an AI assistant using Markdown for clear and structured responses. Format your responses following these guidelines:
 
 1. Use headers for sections:
    # For main topics

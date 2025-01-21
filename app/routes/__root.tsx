@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-router'
 import { Meta, Scripts } from '@tanstack/start'
 import type { ReactNode } from 'react'
-import { Brain } from 'lucide-react'
+import { Github } from 'lucide-react'
 import indexCss from '../index.css?url'
 
 export const Route = createRootRoute({
@@ -21,7 +21,7 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'TanStack Start Starter',
+        title: 'TanStack Chat',
       },
     ],
     links: [{ rel: "stylesheet", href: indexCss }],
@@ -56,10 +56,9 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
               <div className="flex items-center">
                 <Link 
                   to="/" 
-                  className="flex items-center gap-2 ml-1.5 text-2xl font-bold bg-gradient-to-r from-orange-500 to-red-600 text-transparent bg-clip-text"
+                  className="flex items-center gap-2 ml-1.5 text-2xl font-bold bg-gradient-to-r from-orange-500 to-red-600 text-transparent bg-clip-text uppercase"
                 >
-                  <Brain className="w-7 h-7 text-orange-500" />
-                  TanChat
+                  <span className="text-white">TanStack</span> Chat
                 </Link>
                 <div className="h-5 w-px bg-orange-500/10 mx-6" />
                 <div className="flex items-center gap-6">
@@ -79,7 +78,7 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
               </div>
               <div className="flex items-center">
                 <a
-                  href="https://github.com/tanstack/start"
+                  href="https://github.com/codyde/tanchat"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-base font-medium text-gray-300 transition-colors hover:text-orange-500"
