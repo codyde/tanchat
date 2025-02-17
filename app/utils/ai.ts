@@ -1,5 +1,5 @@
-import Anthropic from '@anthropic-ai/sdk'
 import { createServerFn } from '@tanstack/start'
+import { Anthropic } from '@anthropic-ai/sdk'
 import * as Sentry from '@sentry/react'
 
 export interface Message {
@@ -8,22 +8,7 @@ export interface Message {
     content: string
 }
 
-const anthropic = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY || '',
-});
-
-export const genAIResponse = createServerFn({ method: 'GET' })
-    .validator((d: { messages: Message[] }) => d)
-    .handler(async ({ data }) => {
-        const formattedMessages = data.messages.map(msg => ({
-            role: msg.role,
-            content: msg.content
-        }));
-
-        const response = await anthropic.messages.create({
-            model: "claude-3-5-sonnet-20241022",
-            max_tokens: 8192,
-            system: `You are TanStack Chat, an AI assistant using Markdown for clear and structured responses. Format your responses following these guidelines:
+const DEFAULT_SYSTEM_PROMPT = `You are TanStack Chat, an AI assistant using Markdown for clear and structured responses. Format your responses following these guidelines:
 
 1. Use headers for sections:
    # For main topics
@@ -63,17 +48,66 @@ export const genAIResponse = createServerFn({ method: 'GET' })
    - Use inline \`code\` for technical terms
    - Include example usage where helpful
 
-Keep responses concise and well-structured. Use appropriate Markdown formatting to enhance readability and understanding.`,
-            messages: formattedMessages,
+Keep responses concise and well-structured. Use appropriate Markdown formatting to enhance readability and understanding.`;
+
+// Non-streaming implementation
+export const genAIResponse = createServerFn({ method: 'GET' })
+    .validator((d: { 
+        messages: Message[], 
+        systemPrompt?: { value: string, enabled: boolean },
+        streamEnabled?: boolean 
+    }) => d)
+    .handler(async ({ data }) => {
+        const anthropic = new Anthropic({
+            apiKey: process.env.ANTHROPIC_API_KEY || '',
         });
 
-        const content = response.content[0];
-        if (content.type === 'text') {
-            Sentry.getCurrentScope().addAttachment({
-                filename: "llm_response.txt",
-                data: content.text,
-            });
-            return { text: content.text };
+        // Filter out error messages and empty messages
+        const formattedMessages = data.messages
+            .filter(msg => msg.content.trim() !== '' && !msg.content.startsWith('Sorry, I encountered an error'))
+            .map(msg => ({
+                role: msg.role,
+                content: msg.content.trim()
+            }));
+
+        if (formattedMessages.length === 0) {
+            return { error: 'No valid messages to send' };
         }
-        return { text: 'Error: Unexpected response type' };
-    }); 
+
+        // Combine default formatting prompt with custom prompt if enabled
+        const systemPrompt = data.systemPrompt?.enabled 
+            ? `${DEFAULT_SYSTEM_PROMPT}\n\n${data.systemPrompt.value}`
+            : DEFAULT_SYSTEM_PROMPT;
+
+        // Debug log to verify prompt layering
+        console.log('System Prompt Configuration:', {
+            hasCustomPrompt: data.systemPrompt?.enabled,
+            customPromptValue: data.systemPrompt?.value,
+            finalPrompt: systemPrompt
+        });
+
+        try {
+            const response = await anthropic.messages.create({
+                model: "claude-3-5-sonnet-20241022",
+                max_tokens: 4096,
+                system: systemPrompt,
+                messages: formattedMessages,
+            });
+
+            if (response.content[0].type === 'text') {
+                Sentry.getCurrentScope().addAttachment({
+                    filename: "llm_response.txt",
+                    data: response.content[0].text,
+                });
+                return { text: response.content[0].text };
+            }
+            return { error: 'Unexpected response type' };
+        } catch (error) {
+            console.error('Error in genAIResponse:', error);
+            Sentry.captureException(error);
+            if (error instanceof Error && error.message.includes('rate limit')) {
+                return { error: 'Rate limit exceeded. Please try again in a moment.' };
+            }
+            return { error: error instanceof Error ? error.message : 'Failed to get AI response' };
+        }
+    });

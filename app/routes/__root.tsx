@@ -50,45 +50,6 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
         <Meta />
       </head>
       <body className="bg-gray-900 text-gray-100 min-h-screen">
-        <nav className="border-b border-orange-500/10 bg-gray-800/80 backdrop-blur-sm sticky top-0 z-50">
-          <div className="mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex h-14 items-center justify-between">
-              <div className="flex items-center">
-                <Link 
-                  to="/" 
-                  className="flex items-center gap-2 ml-1.5 text-2xl font-bold bg-gradient-to-r from-orange-500 to-red-600 text-transparent bg-clip-text uppercase"
-                >
-                  <span className="text-white">TanStack</span> Chat
-                </Link>
-                <div className="h-5 w-px bg-orange-500/10 mx-6" />
-                <div className="flex items-center gap-6">
-                  <Link 
-                    to="/" 
-                    className="text-base font-medium text-gray-300 transition-colors hover:text-orange-500"
-                  >
-                    Home
-                  </Link>
-                  <Link 
-                    to="/chat" 
-                    className="text-base font-medium text-gray-300 transition-colors hover:text-orange-500"
-                  >
-                    Chat
-                  </Link>
-                </div>
-              </div>
-              <div className="flex items-center">
-                <a
-                  href="https://github.com/codyde/tanchat"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-base font-medium text-gray-300 transition-colors hover:text-orange-500"
-                >
-                  GitHub
-                </a>
-              </div>
-            </div>
-          </div>
-        </nav>
         <main className="flex-1">
           {children}
         </main>
