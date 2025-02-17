@@ -109,3 +109,16 @@ Key dependencies include:
 - vinxi: ^0.5.3
 
 For a complete list of dependencies, see `package.json`.
+
+## Things I want to add...
+
+- [ ] Streaming responses from Claude
+- [ ] Switching providers to OpenAI 
+- [ ] Switching providers to Gemini
+- [ ] Support for images / audio (where models support it)
+- [ ] BetterAuth for authentication
+- [ ] Refactor the sidebar to feel better
+- [ ] Setup API Keys from the settings interface once you're signed in (after auth is setup)
+- [ ] Add a "share" button to share a conversation via link
+- [ ] Setup Sentry in Middleware
+
