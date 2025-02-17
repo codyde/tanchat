@@ -7,7 +7,6 @@ import ReactMarkdown from 'react-markdown'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize from 'rehype-sanitize'
 import rehypeHighlight from 'rehype-highlight'
-import { useSentryToolbar } from '../hooks/useSentryToolbar'
 import { SettingsDialog } from '../components/SettingsDialog'
 
 interface Conversation {
@@ -34,12 +33,18 @@ function LoadingMessage() {
   return (
     <div className="py-6 bg-gradient-to-r from-orange-500/5 to-red-600/5">
       <div className="flex items-start gap-4 max-w-3xl mx-auto w-full">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-orange-500 to-red-600 mt-2 flex items-center justify-center text-sm font-medium text-white flex-shrink-0">
-          AI
+        <div className="relative w-8 h-8 rounded-lg bg-gradient-to-r from-orange-500 to-red-600 mt-2 flex items-center justify-center text-sm font-medium text-white flex-shrink-0">
+          <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-orange-500 to-red-600 animate-pulse"></div>
+          <span className="relative z-10">AI</span>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-gray-400">
-            Thinking{dots}
+          <div className="flex items-center gap-2">
+            <div className="text-gray-400 font-medium">Thinking</div>
+            <div className="flex gap-1">
+              <div className={`w-1.5 h-1.5 rounded-full bg-orange-500 ${dots.length >= 1 ? 'animate-bounce' : 'opacity-30'}`} style={{ animationDelay: '0ms' }}></div>
+              <div className={`w-1.5 h-1.5 rounded-full bg-orange-500 ${dots.length >= 2 ? 'animate-bounce' : 'opacity-30'}`} style={{ animationDelay: '150ms' }}></div>
+              <div className={`w-1.5 h-1.5 rounded-full bg-orange-500 ${dots.length >= 3 ? 'animate-bounce' : 'opacity-30'}`} style={{ animationDelay: '300ms' }}></div>
+            </div>
           </div>
         </div>
       </div>
@@ -579,7 +584,6 @@ function Home() {
             ))}
           </div>
 
-          {/* Sidebar Footer */}
           {isSidebarExpanded && conversations.length > 0 && (
             <div className="p-4 border-t border-orange-500/10">
               <button
@@ -594,7 +598,7 @@ function Home() {
         </div>
       </div>
 
-      {/* Mobile sidebar toggle */}
+    
       <button
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
         className="md:hidden fixed bottom-4 left-4 z-50 p-2 bg-gradient-to-r from-orange-500 to-red-600 rounded-full shadow-lg"
@@ -647,13 +651,26 @@ function Home() {
                 ))}
                 {isLoading && (
                   <div className="py-6 bg-gradient-to-r from-orange-500/5 to-red-600/5">
-                    <div className="flex items-start gap-4 max-w-3xl mx-auto w-full">
-                      <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-orange-500 to-red-600 mt-2 flex items-center justify-center text-sm font-medium text-white flex-shrink-0">
-                        AI
+                    <div className="flex items-center gap-4 max-w-3xl mx-auto w-full">
+                      <div className="relative w-8 h-8 flex-shrink-0">
+                        {/* Spinning gradient ring */}
+                        <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-orange-500 via-red-500 to-orange-500 animate-[spin_2s_linear_infinite]"></div>
+                        {/* Inner content */}
+                        <div className="absolute inset-[2px] rounded-lg bg-gray-900 flex items-center justify-center">
+                          <div className="relative w-full h-full rounded-lg bg-gradient-to-r from-orange-500 to-red-600 flex items-center justify-center">
+                            <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-orange-500 to-red-600 animate-pulse"></div>
+                            <span className="relative z-10 text-sm font-medium text-white">AI</span>
+                          </div>
+                        </div>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-gray-400">
-                          Thinking...
+                        <div className="flex items-center gap-3">
+                          <div className="text-gray-400 font-medium text-lg">Thinking</div>
+                          <div className="flex gap-2">
+                            <div className="w-2 h-2 rounded-full bg-orange-500 animate-[bounce_0.8s_infinite]" style={{ animationDelay: '0ms' }}></div>
+                            <div className="w-2 h-2 rounded-full bg-orange-500 animate-[bounce_0.8s_infinite]" style={{ animationDelay: '200ms' }}></div>
+                            <div className="w-2 h-2 rounded-full bg-orange-500 animate-[bounce_0.8s_infinite]" style={{ animationDelay: '400ms' }}></div>
+                          </div>
                         </div>
                       </div>
                     </div>

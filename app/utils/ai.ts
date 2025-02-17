@@ -74,7 +74,6 @@ export const genAIResponse = createServerFn({ method: 'GET' })
             return { error: 'No valid messages to send' };
         }
 
-        // Combine default formatting prompt with custom prompt if enabled
         const systemPrompt = data.systemPrompt?.enabled 
             ? `${DEFAULT_SYSTEM_PROMPT}\n\n${data.systemPrompt.value}`
             : DEFAULT_SYSTEM_PROMPT;
@@ -95,10 +94,6 @@ export const genAIResponse = createServerFn({ method: 'GET' })
             });
 
             if (response.content[0].type === 'text') {
-                Sentry.getCurrentScope().addAttachment({
-                    filename: "llm_response.txt",
-                    data: response.content[0].text,
-                });
                 return { text: response.content[0].text };
             }
             return { error: 'Unexpected response type' };
