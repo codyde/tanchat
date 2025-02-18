@@ -19,39 +19,6 @@ export const Route = createFileRoute('/')({
   component: Home,
 })
 
-function LoadingMessage() {
-  const [dots, setDots] = useState('');
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setDots(prev => prev.length >= 3 ? '' : prev + '.');
-    }, 500);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <div className="py-6 bg-gradient-to-r from-orange-500/5 to-red-600/5">
-      <div className="flex items-start gap-4 max-w-3xl mx-auto w-full">
-        <div className="relative w-8 h-8 rounded-lg bg-gradient-to-r from-orange-500 to-red-600 mt-2 flex items-center justify-center text-sm font-medium text-white flex-shrink-0">
-          <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-orange-500 to-red-600 animate-pulse"></div>
-          <span className="relative z-10">AI</span>
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <div className="text-gray-400 font-medium">Thinking</div>
-            <div className="flex gap-1">
-              <div className={`w-1.5 h-1.5 rounded-full bg-orange-500 ${dots.length >= 1 ? 'animate-bounce' : 'opacity-30'}`} style={{ animationDelay: '0ms' }}></div>
-              <div className={`w-1.5 h-1.5 rounded-full bg-orange-500 ${dots.length >= 2 ? 'animate-bounce' : 'opacity-30'}`} style={{ animationDelay: '150ms' }}></div>
-              <div className={`w-1.5 h-1.5 rounded-full bg-orange-500 ${dots.length >= 3 ? 'animate-bounce' : 'opacity-30'}`} style={{ animationDelay: '300ms' }}></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function Home() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
