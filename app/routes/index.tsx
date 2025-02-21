@@ -8,6 +8,7 @@ import rehypeRaw from 'rehype-raw'
 import rehypeSanitize from 'rehype-sanitize'
 import rehypeHighlight from 'rehype-highlight'
 import { SettingsDialog } from '../components/SettingsDialog'
+import { useChatState, chatActions } from '../store/chat'
 
 interface Conversation {
   id: string
@@ -20,354 +21,42 @@ export const Route = createFileRoute('/')({
 })
 
 function Home() {
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
-  const [input, setInput] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true)
   const { isReady: isDBReady, error: dbError } = useDB()
+  const conversations = useChatState(state => state.conversations)
+  const currentConversationId = useChatState(state => state.currentConversationId)
+  const isLoading = useChatState(state => state.isLoading)
+  const currentConversation = useChatState(state => state.conversations.find(c => c.id === state.currentConversationId))
+  const messages = currentConversation?.messages || []
+  
+  // Local state
+  const [input, setInput] = useState('')
+  const [editingChatId, setEditingChatId] = useState<string | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
-  const [editingChatId, setEditingChatId] = useState<string | null>(null)
 
-  // Load conversations and user settings from database
+  // Load conversations from database
   useEffect(() => {
     if (!isDBReady) return
 
     try {
-      const dbConversations = getConversations()
-      const conversationsWithMessages = dbConversations.map((conv) => {
-        const messages = getMessagesForConversation(conv.id)
-        return {
-          id: conv.id,
-          title: conv.title,
-          messages: messages.map(msg => ({
-            id: msg.id,
-            role: msg.role as 'user' | 'assistant',
-            content: msg.content
-          }))
-        }
-      })
-      setConversations(conversationsWithMessages)
-
-      // Load avatar
-      const avatar = getUserSetting('avatar')
-      if (avatar) {
-        setAvatarUrl(avatar)
-      }
+      chatActions.loadConversations()
     } catch (error) {
       console.error('Error loading data:', error)
     }
   }, [isDBReady])
 
-  const currentConversation = conversations.find(c => c.id === currentConversationId)
-  const messages = currentConversation?.messages || []
-
-  const createNewChat = () => {
-    if (!isDBReady) return
-
-    const newConversation: Conversation = {
-      id: Date.now().toString(),
-      title: 'New Chat',
-      messages: []
-    }
-
-    try {
-      createConversation(newConversation.id, newConversation.title)
-      setConversations(prev => [...prev, newConversation])
-      setCurrentConversationId(newConversation.id)
-    } catch (error) {
-      console.error('Error creating new chat:', error)
-    }
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading || !isDBReady) return;
-
-    // If no current conversation, create one
-    if (!currentConversationId) {
-      const newConversationId = Date.now().toString();
-      const newConversation: Conversation = {
-        id: newConversationId,
-        title: 'New Chat',
-        messages: []
-      };
-
-      try {
-        createConversation(newConversation.id, newConversation.title);
-        setConversations(prev => [...prev, newConversation]);
-        setCurrentConversationId(newConversationId);
-
-        // Continue with the message submission for the new conversation
-        const userMessage: Message = {
-          id: Date.now().toString(),
-          role: 'user',
-          content: input.trim(),
-        };
-
-        // Update conversation title with first message
-        const newTitle = input.trim().slice(0, 30);
-        updateConversationTitle(newConversationId, newTitle);
-
-        // Add user message to database
-        addMessage({
-          id: userMessage.id,
-          conversation_id: newConversationId,
-          role: userMessage.role,
-          content: userMessage.content
-        });
-
-        setConversations(prev => prev.map(conv =>
-          conv.id === newConversationId
-            ? { ...conv, title: newTitle, messages: [userMessage] }
-            : conv
-        ));
-        setInput('');
-        setIsLoading(true);
-
-        // Get active prompt
-        let systemPrompt;
-        try {
-          const prompts = getPrompts();
-          const activePrompt = prompts.find(p => p.is_active);
-          if (activePrompt) {
-            systemPrompt = {
-              value: activePrompt.content,
-              enabled: true
-            };
-          }
-        } catch (error) {
-          console.error('Error getting settings:', error);
-        }
-
-        // Create a temporary message for the response
-        const tempMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: ''
-        };
-
-        try {
-          console.log('Sending messages:', [...messages, userMessage]);
-          const response = await genAIResponse({
-            data: {
-              messages: messages.concat(userMessage),
-              systemPrompt: systemPrompt
-            }
-          });
-
-          if (!response.text?.trim()) {
-            throw new Error('Received empty response from AI');
-          }
-
-          tempMessage.content = response.text;
-
-          addMessage({
-            id: tempMessage.id,
-            conversation_id: newConversationId,
-            role: tempMessage.role,
-            content: tempMessage.content
-          });
-
-          setConversations(prev => prev.map(conv =>
-            conv.id === newConversationId
-              ? { ...conv, messages: [...conv.messages, tempMessage] }
-              : conv
-          ));
-        } catch (error) {
-          console.error('Error getting response:', error);
-          tempMessage.content = 'Sorry, I encountered an error processing your request.';
-
-          addMessage({
-            id: tempMessage.id,
-            conversation_id: newConversationId,
-            role: tempMessage.role,
-            content: tempMessage.content
-          });
-
-          setConversations(prev => prev.map(conv =>
-            conv.id === newConversationId
-              ? { ...conv, messages: [...conv.messages, tempMessage] }
-              : conv
-          ));
-        }
-      } catch (error) {
-        console.error('Error:', error);
-        const errorMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: 'Sorry, I encountered an error processing your request.',
-        };
-
-        try {
-          addMessage({
-            id: errorMessage.id,
-            conversation_id: newConversationId,
-            role: errorMessage.role,
-            content: errorMessage.content
-          });
-
-          setConversations(prev => prev.map(conv =>
-            conv.id === newConversationId
-              ? { ...conv, messages: [...conv.messages, errorMessage] }
-              : conv
-          ));
-        } catch (dbError) {
-          console.error('Error saving error message:', dbError);
-        }
-      }
-      setIsLoading(false);
-      return;
-    }
-
-    // Handle existing conversation case
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: input.trim(),
-    };
-
-    try {
-      // Add user message to database
-      addMessage({
-        id: userMessage.id,
-        conversation_id: currentConversationId,
-        role: userMessage.role,
-        content: userMessage.content
-      });
-
-      setConversations(prev => prev.map(conv =>
-        conv.id === currentConversationId
-          ? { ...conv, messages: [...conv.messages, userMessage] }
-          : conv
-      ));
-      setInput('');
-      setIsLoading(true);
-
-      // Get active prompt
-      let systemPrompt;
-      try {
-        const prompts = getPrompts();
-        const activePrompt = prompts.find(p => p.is_active);
-        if (activePrompt) {
-          systemPrompt = {
-            value: activePrompt.content,
-            enabled: true
-          };
-        }
-      } catch (error) {
-        console.error('Error getting settings:', error);
-      }
-
-      // Create a temporary message for the response
-      const tempMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: ''
-      };
-
-      try {
-        console.log('Sending messages:', [...messages, userMessage]);
-        const response = await genAIResponse({
-          data: {
-            messages: messages.concat(userMessage),
-            systemPrompt: systemPrompt
-          }
-        });
-
-        if (!response.text?.trim()) {
-          throw new Error('Received empty response from AI');
-        }
-
-        tempMessage.content = response.text;
-
-        addMessage({
-          id: tempMessage.id,
-          conversation_id: currentConversationId,
-          role: tempMessage.role,
-          content: tempMessage.content
-        });
-
-        setConversations(prev => prev.map(conv =>
-          conv.id === currentConversationId
-            ? { ...conv, messages: [...conv.messages, tempMessage] }
-            : conv
-        ));
-      } catch (error) {
-        console.error('Error getting response:', error);
-        tempMessage.content = 'Sorry, I encountered an error processing your request.';
-
-        addMessage({
-          id: tempMessage.id,
-          conversation_id: currentConversationId,
-          role: tempMessage.role,
-          content: tempMessage.content
-        });
-
-        setConversations(prev => prev.map(conv =>
-          conv.id === currentConversationId
-            ? { ...conv, messages: [...conv.messages, tempMessage] }
-            : conv
-        ));
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: 'Sorry, I encountered an error processing your request.',
-      };
-
-      try {
-        addMessage({
-          id: errorMessage.id,
-          conversation_id: currentConversationId,
-          role: errorMessage.role,
-          content: errorMessage.content
-        });
-
-        setConversations(prev => prev.map(conv =>
-          conv.id === currentConversationId
-            ? { ...conv, messages: [...conv.messages, errorMessage] }
-            : conv
-        ));
-      } catch (dbError) {
-        console.error('Error saving error message:', dbError);
-      }
-    }
-    setIsLoading(false);
+    e.preventDefault()
+    if (!input.trim() || isLoading || !isDBReady) return
+    
+    const currentInput = input
+    setInput('') // Clear input early for better UX
+    await chatActions.sendMessage(currentInput)
   }
 
-  const handleDeleteConversation = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (!isDBReady) return
-
-    try {
-      deleteConversation(id)
-      setConversations(prev => prev.filter(conv => conv.id !== id))
-      if (currentConversationId === id) {
-        setCurrentConversationId(null)
-      }
-    } catch (error) {
-      console.error('Error deleting conversation:', error)
-    }
-  }
-
-  const clearAllChats = () => {
-    if (!isDBReady || !window.confirm('Are you sure you want to clear all chats? This cannot be undone.')) return
-
-    try {
-      conversations.forEach(conv => {
-        deleteConversation(conv.id)
-      })
-      setConversations([])
-      setCurrentConversationId(null)
-    } catch (error) {
-      console.error('Error clearing chats:', error)
-    }
+  // Update textarea value handler
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value)
   }
 
   // Show error state if database failed to initialize
@@ -405,9 +94,8 @@ function Home() {
         <button
           onClick={() => setIsDropdownOpen(!isDropdownOpen)}
           className="w-10 h-10 rounded-full bg-gradient-to-r from-orange-500 to-red-600 flex items-center justify-center text-white hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-orange-500 overflow-hidden"
-          style={avatarUrl ? { backgroundImage: `url(${avatarUrl})`, backgroundSize: 'cover' } : undefined}
         >
-          {!avatarUrl && <User className="w-5 h-5" />}
+          {!currentConversation && <User className="w-5 h-5" />}
         </button>
 
         {isDropdownOpen && (
@@ -444,42 +132,20 @@ function Home() {
       <SettingsDialog
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
-        onAvatarChange={setAvatarUrl}
       />
 
       {/* Sidebar */}
-      <div
-        className={`fixed md:relative inset-y-0 left-0 z-50 ${isSidebarExpanded ? 'w-64' : 'w-16'
-          } bg-gray-800/80 backdrop-blur-sm transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-          } transition-all duration-300 ease-in-out md:translate-x-0 border-r border-orange-500/10`}
-      >
+      <div className="w-64 bg-gray-800/80 backdrop-blur-sm border-r border-orange-500/10">
         <div className="flex flex-col h-full">
-          {/* Sidebar Header with Toggle */}
-          <div className="p-4 flex items-center justify-between">
-            {isSidebarExpanded ? (
-              <>
-                <button
-                  onClick={createNewChat}
-                  className="flex-1 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-orange-500 to-red-600 rounded-lg hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-orange-500 flex items-center justify-center gap-2"
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>New Chat</span>
-                </button>
-                <button
-                  onClick={() => setIsSidebarExpanded(false)}
-                  className="ml-2 p-1.5 rounded-lg text-gray-400 hover:text-orange-500 focus:outline-none"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={() => setIsSidebarExpanded(true)}
-                className="w-full p-1.5 rounded-lg text-gray-400 hover:text-orange-500 focus:outline-none flex items-center justify-center"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            )}
+          {/* Sidebar Header */}
+          <div className="p-4">
+            <button
+              onClick={chatActions.createNewChat}
+              className="w-full px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-orange-500 to-red-600 rounded-lg hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-orange-500 flex items-center justify-center gap-2"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>New Chat</span>
+            </button>
           </div>
 
           {/* Conversations List */}
@@ -495,66 +161,63 @@ function Home() {
                       ? 'bg-gradient-to-r from-orange-500/10 to-red-600/10 text-white'
                       : 'text-gray-300 hover:bg-gray-700/50'
                   }`}
-                  onClick={() => setCurrentConversationId(conv.id)}
+                  onClick={() => chatActions.setCurrentConversationId(conv.id)}
                 >
                   <MessageCircle className="w-4 h-4 flex-shrink-0" />
-                  {isSidebarExpanded && (
-                    <div className="flex-1 min-w-0 flex items-center gap-2">
-                      {editingChatId === conv.id ? (
-                        <input
-                          type="text"
-                          value={conv.title}
-                          onChange={(e) => {
-                            updateConversationTitle(conv.id, e.target.value)
-                            setConversations(prev => prev.map(c => 
-                              c.id === conv.id ? { ...c, title: e.target.value } : c
-                            ))
+                  <div className="flex-1 min-w-0 flex items-center gap-2">
+                    {editingChatId === conv.id ? (
+                      <input
+                        type="text"
+                        value={conv.title}
+                        onChange={(e) => chatActions.updateChatTitle(conv.id, e.target.value)}
+                        onBlur={() => setEditingChatId(null)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            setEditingChatId(null)
+                          }
+                        }}
+                        className="w-full bg-gray-700 border-none focus:outline-none focus:ring-1 focus:ring-orange-500 rounded px-1"
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      <>
+                        <span className="truncate flex-1">{conv.title}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setEditingChatId(conv.id)
                           }}
-                          onBlur={() => setEditingChatId(null)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              setEditingChatId(null)
-                            }
-                          }}
-                          className="w-full bg-gray-700 border-none focus:outline-none focus:ring-1 focus:ring-orange-500 rounded px-1"
-                          autoFocus
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      ) : (
-                        <>
-                          <span className="truncate flex-1">{conv.title}</span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setEditingChatId(conv.id)
-                            }}
-                            className="p-1 text-gray-400 hover:text-orange-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                            title="Rename chat"
-                          >
-                            <Edit2 className="w-3 h-3" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                  {isSidebarExpanded && (
-                    <button
-                      onClick={(e) => handleDeleteConversation(conv.id, e)}
-                      className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="Delete conversation"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
+                          className="p-1 text-gray-400 hover:text-orange-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      chatActions.deleteChat(conv.id)
+                    }}
+                    className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Delete conversation"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             ))}
           </div>
 
-          {isSidebarExpanded && conversations.length > 0 && (
+          {conversations.length > 0 && (
             <div className="p-4 border-t border-orange-500/10">
               <button
-                onClick={clearAllChats}
+                onClick={() => {
+                  if (window.confirm('Are you sure you want to clear all chats? This cannot be undone.')) {
+                    chatActions.clearAllChats()
+                  }
+                }}
                 className="w-full px-4 py-2 text-sm font-medium text-red-500 bg-red-500/10 rounded-lg hover:bg-red-500/20 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 flex items-center justify-center gap-2"
               >
                 <Trash2 className="w-4 h-4" />
@@ -565,21 +228,8 @@ function Home() {
         </div>
       </div>
 
-    
-      <button
-        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className="md:hidden fixed bottom-4 left-4 z-50 p-2 bg-gradient-to-r from-orange-500 to-red-600 rounded-full shadow-lg"
-      >
-        {isSidebarOpen ? (
-          <X className="w-6 h-6 text-white" />
-        ) : (
-          <Menu className="w-6 h-6 text-white" />
-        )}
-      </button>
-
       {/* Main chat area */}
-      <div className={`flex-1 flex flex-col transition-all duration-300 relative ${isSidebarExpanded ? 'md:ml-0' : 'md:ml-0'
-        }`}>
+      <div className="flex-1 flex flex-col transition-all duration-300 relative">
         {currentConversationId ? (
           <>
             <div className="flex-1 overflow-y-auto pb-24">
@@ -598,16 +248,13 @@ function Home() {
                           AI
                         </div>
                       ) : (
-                        <div 
-                          className="w-8 h-8 rounded-lg bg-gray-700 flex items-center justify-center text-sm font-medium text-white flex-shrink-0 overflow-hidden"
-                          style={avatarUrl ? { backgroundImage: `url(${avatarUrl})`, backgroundSize: 'cover' } : undefined}
-                        >
-                          {!avatarUrl && 'Y'}
+                        <div className="w-8 h-8 rounded-lg bg-gray-700 flex items-center justify-center text-sm font-medium text-white flex-shrink-0">
+                          Y
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
                         <ReactMarkdown
-                          className="prose dark:prose-invert"
+                          className="prose dark:prose-invert max-w-none"
                           rehypePlugins={[rehypeRaw, rehypeSanitize, rehypeHighlight]}
                         >
                           {message.content}
@@ -618,11 +265,9 @@ function Home() {
                 ))}
                 {isLoading && (
                   <div className="py-6 bg-gradient-to-r from-orange-500/5 to-red-600/5">
-                    <div className="flex items-center gap-4 max-w-3xl mx-auto w-full">
+                    <div className="flex items-start gap-4 max-w-3xl mx-auto w-full">
                       <div className="relative w-8 h-8 flex-shrink-0">
-                        {/* Spinning gradient ring */}
                         <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-orange-500 via-red-500 to-orange-500 animate-[spin_2s_linear_infinite]"></div>
-                        {/* Inner content */}
                         <div className="absolute inset-[2px] rounded-lg bg-gray-900 flex items-center justify-center">
                           <div className="relative w-full h-full rounded-lg bg-gradient-to-r from-orange-500 to-red-600 flex items-center justify-center">
                             <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-orange-500 to-red-600 animate-pulse"></div>
@@ -643,14 +288,6 @@ function Home() {
                     </div>
                   </div>
                 )}
-                {messages.length === 0 && !isLoading && (
-                  <div className="text-center py-20">
-                    <h2 className="text-6xl font-semibold mb-2 bg-gradient-to-r from-orange-500 to-red-600 text-transparent bg-clip-text">Ready to Chat?</h2>
-                    <p className="text-gray-400 text-xl">
-                      Start a conversation below. Don't worry, our AI is mostly harmless... mostly 😈
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -660,7 +297,7 @@ function Home() {
                   <div className="relative">
                     <textarea
                       value={input}
-                      onChange={(e) => setInput(e.target.value)}
+                      onChange={handleInputChange}
                       placeholder="Type something clever (or don't, we won't judge)..."
                       className="w-full rounded-lg border border-orange-500/20 bg-gray-800/50 pl-4 pr-12 py-3 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-transparent resize-none overflow-hidden"
                       disabled={isLoading}
@@ -703,7 +340,7 @@ function Home() {
                 <div className="relative max-w-xl mx-auto">
                   <textarea
                     value={input}
-                    onChange={(e) => setInput(e.target.value)}
+                    onChange={handleInputChange}
                     placeholder="Type something clever (or don't, we won't judge)..."
                     className="w-full rounded-lg border border-orange-500/20 bg-gray-800/50 pl-4 pr-12 py-3 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-transparent resize-none overflow-hidden"
                     disabled={isLoading}

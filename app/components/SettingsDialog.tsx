@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { getSetting, setSetting, useDB, getPrompts, createPrompt, deletePrompt, setPromptActive, getUserSetting, setUserSetting, type DBPrompt } from '../utils/db'
-import { PlusCircle, Trash2, Edit2, Check, X, User } from 'lucide-react'
+import { useDB, getPrompts, createPrompt, deletePrompt, setPromptActive, getUserSetting, setUserSetting, type DBPrompt } from '../utils/db'
+import { PlusCircle, Trash2, User } from 'lucide-react'
 
 interface SettingsDialogProps {
   isOpen: boolean
@@ -10,8 +10,7 @@ interface SettingsDialogProps {
 
 export function SettingsDialog({ isOpen, onClose, onAvatarChange }: SettingsDialogProps) {
   const [prompts, setPrompts] = useState<DBPrompt[]>([])
-  const [newPromptName, setNewPromptName] = useState('')
-  const [newPromptContent, setNewPromptContent] = useState('')
+  const [promptForm, setPromptForm] = useState({ name: '', content: '' })
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [isAddingPrompt, setIsAddingPrompt] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -50,13 +49,12 @@ export function SettingsDialog({ isOpen, onClose, onAvatarChange }: SettingsDial
   }
 
   const handleAddPrompt = () => {
-    if (!newPromptName.trim() || !newPromptContent.trim()) return
+    if (!promptForm.name.trim() || !promptForm.content.trim()) return
     
     const id = Date.now().toString()
-    createPrompt(id, newPromptName, newPromptContent)
+    createPrompt(id, promptForm.name, promptForm.content)
     setPrompts(getPrompts())
-    setNewPromptName('')
-    setNewPromptContent('')
+    setPromptForm({ name: '', content: '' })
     setIsAddingPrompt(false)
   }
 
@@ -78,8 +76,7 @@ export function SettingsDialog({ isOpen, onClose, onAvatarChange }: SettingsDial
     onClose()
     // Reset the form when closing
     setIsAddingPrompt(false)
-    setNewPromptName('')
-    setNewPromptContent('')
+    setPromptForm({ name: '', content: '' })
   }
 
   const handleResetDatabase = () => {
@@ -160,14 +157,14 @@ export function SettingsDialog({ isOpen, onClose, onAvatarChange }: SettingsDial
                 <div className="space-y-3 mb-4 p-3 bg-gray-700/50 rounded-lg">
                   <input
                     type="text"
-                    value={newPromptName}
-                    onChange={(e) => setNewPromptName(e.target.value)}
+                    value={promptForm.name}
+                    onChange={(e) => setPromptForm(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="Prompt name..."
                     className="w-full px-3 py-2 text-sm text-white bg-gray-700 rounded-lg border border-gray-600 focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
                   />
                   <textarea
-                    value={newPromptContent}
-                    onChange={(e) => setNewPromptContent(e.target.value)}
+                    value={promptForm.content}
+                    onChange={(e) => setPromptForm(prev => ({ ...prev, content: e.target.value }))}
                     placeholder="Enter prompt content..."
                     className="w-full h-32 px-3 py-2 text-sm text-white bg-gray-700 rounded-lg border border-gray-600 focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
                   />
