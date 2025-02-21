@@ -1,13 +1,10 @@
 // app/routes/__root.tsx
 import {
   Outlet,
-  ScrollRestoration,
   createRootRoute,
-  Link,
 } from '@tanstack/react-router'
 import { Meta, Scripts } from '@tanstack/start'
 import type { ReactNode } from 'react'
-import { Github } from 'lucide-react'
 import indexCss from '../index.css?url'
 
 export const Route = createRootRoute({
@@ -53,7 +50,6 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
         <main className="flex-1">
           {children}
         </main>
-        <ScrollRestoration />
         <Scripts />
       </body>
     </html>

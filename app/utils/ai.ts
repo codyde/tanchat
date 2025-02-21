@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/start'
 import { Anthropic } from '@anthropic-ai/sdk'
 import * as Sentry from '@sentry/react'
-
+// import loggingMiddleware from '../middleware'
 export interface Message {
     id: string
     role: 'user' | 'assistant'
@@ -52,11 +52,13 @@ Keep responses concise and well-structured. Use appropriate Markdown formatting 
 
 // Non-streaming implementation
 export const genAIResponse = createServerFn({ method: 'GET' })
+   
     .validator((d: { 
         messages: Message[], 
         systemPrompt?: { value: string, enabled: boolean },
         streamEnabled?: boolean 
     }) => d)
+    // .middleware([loggingMiddleware])
     .handler(async ({ data }) => {
         const anthropic = new Anthropic({
             apiKey: process.env.ANTHROPIC_API_KEY || '',

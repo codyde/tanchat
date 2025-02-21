@@ -5,6 +5,7 @@ import * as Sentry from '@sentry/react'
 
 export function createRouter() {
   const router = createTanStackRouter({
+    scrollRestoration: true,
     routeTree,
   })
 
