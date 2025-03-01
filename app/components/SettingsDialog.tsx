@@ -1,89 +1,28 @@
-import { useState, useEffect, useRef } from 'react'
-import { useDB, getPrompts, createPrompt, deletePrompt, setPromptActive, getUserSetting, setUserSetting, type DBPrompt } from '../utils/db'
-import { PlusCircle, Trash2, User } from 'lucide-react'
+import { useState } from 'react'
+import { PlusCircle, Trash2 } from 'lucide-react'
+import { useAppState, type Prompt } from '../store/hooks'
 
 interface SettingsDialogProps {
   isOpen: boolean
   onClose: () => void
-  onAvatarChange?: (avatarUrl: string) => void
 }
 
-export function SettingsDialog({ isOpen, onClose, onAvatarChange }: SettingsDialogProps) {
-  const [prompts, setPrompts] = useState<DBPrompt[]>([])
+export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
   const [promptForm, setPromptForm] = useState({ name: '', content: '' })
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [isAddingPrompt, setIsAddingPrompt] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const { isReady } = useDB()
-
-  useEffect(() => {
-    if (isOpen && isReady) {
-      try {
-        // Load prompts
-        const loadedPrompts = getPrompts()
-        setPrompts(loadedPrompts)
-
-        // Load avatar
-        const avatar = getUserSetting('avatar')
-        if (avatar) {
-          setAvatarUrl(avatar)
-        }
-      } catch (error) {
-        console.error('Error loading settings:', error)
-      }
-    }
-  }, [isOpen, isReady])
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        const base64String = reader.result as string
-        setUserSetting('avatar', base64String)
-        setAvatarUrl(base64String)
-        onAvatarChange?.(base64String)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
+  const { prompts, createPrompt, deletePrompt, setPromptActive } = useAppState()
 
   const handleAddPrompt = () => {
     if (!promptForm.name.trim() || !promptForm.content.trim()) return
-    
-    const id = Date.now().toString()
-    createPrompt(id, promptForm.name, promptForm.content)
-    setPrompts(getPrompts())
+    createPrompt(promptForm.name, promptForm.content)
     setPromptForm({ name: '', content: '' })
     setIsAddingPrompt(false)
-  }
-
-  const handleDeletePrompt = (id: string) => {
-    deletePrompt(id)
-    setPrompts(getPrompts())
-  }
-
-  const handleSetActivePrompt = (id: string, currentlyActive: boolean) => {
-    setPromptActive(id, !currentlyActive)
-    setPrompts(getPrompts())
-  }
-
-  const handleSave = () => {
-    onClose()
   }
 
   const handleClose = () => {
     onClose()
-    // Reset the form when closing
     setIsAddingPrompt(false)
     setPromptForm({ name: '', content: '' })
-  }
-
-  const handleResetDatabase = () => {
-    if (window.confirm('This will reset your database and clear all conversations. Are you sure?')) {
-      localStorage.removeItem('chatdb')
-      window.location.reload()
-    }
   }
 
   if (!isOpen) return null
@@ -107,39 +46,8 @@ export function SettingsDialog({ isOpen, onClose, onAvatarChange }: SettingsDial
           </div>
           
           <div className="space-y-6">
-            {/* Avatar Upload */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-white">
-                User Avatar
-              </label>
-              <div className="flex items-center gap-4">
-                <div 
-                  className="w-16 h-16 rounded-full bg-gray-700 flex items-center justify-center overflow-hidden"
-                  style={avatarUrl ? { backgroundImage: `url(${avatarUrl})`, backgroundSize: 'cover' } : undefined}
-                >
-                  {!avatarUrl && <User className="w-8 h-8 text-gray-400" />}
-                </div>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-orange-500 to-red-600 rounded-lg hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                >
-                  Upload Image
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-              </div>
-              <p className="text-xs text-gray-400">
-                Upload a profile picture to personalize your chat experience.
-              </p>
-            </div>
-
             {/* Prompts Management */}
-            <div className="space-y-2 border-t border-gray-700 pt-4">
+            <div className="space-y-2">
               <div className="flex items-center justify-between mb-4">
                 <label className="block text-sm font-medium text-white">
                   System Prompts
@@ -198,12 +106,12 @@ export function SettingsDialog({ isOpen, onClose, onAvatarChange }: SettingsDial
                           type="checkbox"
                           className="sr-only peer"
                           checked={prompt.is_active}
-                          onChange={() => handleSetActivePrompt(prompt.id, prompt.is_active)}
+                          onChange={() => setPromptActive(prompt.id, !prompt.is_active)}
                         />
                         <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
                       </label>
                       <button
-                        onClick={() => handleDeletePrompt(prompt.id)}
+                        onClick={() => deletePrompt(prompt.id)}
                         className="p-1 text-gray-400 hover:text-red-500"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -217,18 +125,6 @@ export function SettingsDialog({ isOpen, onClose, onAvatarChange }: SettingsDial
               </p>
             </div>
 
-            <div className="border-t border-gray-700 pt-4">
-              <h3 className="text-sm font-medium text-white mb-2">Database Management</h3>
-              <button
-                onClick={handleResetDatabase}
-                className="px-4 py-2 text-sm font-medium text-red-500 bg-red-500/10 rounded-lg hover:bg-red-500/20 transition-colors focus:outline-none"
-              >
-                Reset Database
-              </button>
-              <p className="text-xs text-gray-400 mt-1">
-                This will clear all conversations and settings. Use this if you encounter database issues.
-              </p>
-            </div>
           </div>
 
           <div className="mt-6 flex justify-end gap-3">
@@ -239,10 +135,10 @@ export function SettingsDialog({ isOpen, onClose, onAvatarChange }: SettingsDial
               Cancel
             </button>
             <button
-              onClick={handleSave}
+              onClick={handleClose}
               className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-orange-500 to-red-600 rounded-lg hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-orange-500"
             >
-              Save Changes
+              Close
             </button>
           </div>
         </div>

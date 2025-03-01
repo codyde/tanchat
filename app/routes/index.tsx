@@ -1,263 +1,302 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
-import { genAIResponse, type Message } from '../utils/ai'
-import { createConversation, updateConversationTitle, getConversations, addMessage, getMessagesForConversation, deleteConversation, type DBConversation, type DBMessage, useDB, getPrompts, getUserSetting, getSetting } from '../utils/db'
+import { useEffect, useState, useRef } from 'react'
 import { PlusCircle, MessageCircle, ChevronLeft, ChevronRight, Trash2, X, Menu, Send, Settings, User, LogOut, Edit2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize from 'rehype-sanitize'
 import rehypeHighlight from 'rehype-highlight'
 import { SettingsDialog } from '../components/SettingsDialog'
-import { useChatState, chatActions } from '../store/chat'
-
-interface Conversation {
-  id: string
-  title: string
-  messages: Message[]
-}
-
-export const Route = createFileRoute('/')({
-  component: Home,
-})
+import { useAppState } from '../store/hooks'
+import { store } from '../store/store'
+import { genAIResponse, type Message } from '../utils/ai'
+import * as Sentry from '@sentry/react'
 
 function Home() {
-  const { isReady: isDBReady, error: dbError } = useDB()
-  const conversations = useChatState(state => state.conversations)
-  const currentConversationId = useChatState(state => state.currentConversationId)
-  const isLoading = useChatState(state => state.isLoading)
-  const currentConversation = useChatState(state => state.conversations.find(c => c.id === state.currentConversationId))
+  const {
+    conversations,
+    currentConversationId,
+    isLoading,
+    setCurrentConversationId,
+    addConversation,
+    deleteConversation,
+    updateConversationTitle,
+    addMessage,
+    setLoading,
+    getCurrentConversation,
+    getActivePrompt
+  } = useAppState()
+
+  const currentConversation = getCurrentConversation(store.state)
   const messages = currentConversation?.messages || []
-  
+
   // Local state
   const [input, setInput] = useState('')
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const [pendingMessage, setPendingMessage] = useState<Message | null>(null)
 
-  // Load conversations from database
-  useEffect(() => {
-    if (!isDBReady) return
-
-    try {
-      chatActions.loadConversations()
-    } catch (error) {
-      console.error('Error loading data:', error)
+  const scrollToBottom = () => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop =
+        messagesContainerRef.current.scrollHeight
     }
-  }, [isDBReady])
+  }
+
+  // Scroll to bottom when messages change or loading state changes
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages, isLoading])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input.trim() || isLoading || !isDBReady) return
-    
-    const currentInput = input
-    setInput('') // Clear input early for better UX
-    await chatActions.sendMessage(currentInput)
+
+
+    if (!input.trim() || isLoading) return
+
+    return await Sentry.startSpan(
+      {
+        name: "Chat Message Submission",
+        op: "chat.submit"
+      },
+      async () => {
+
+
+        const currentInput = input
+        setInput('') // Clear input early for better UX
+        setLoading(true)
+
+        try {
+          let conversationId = currentConversationId
+
+          // If no current conversation, create one
+          if (!conversationId) {
+            conversationId = Date.now().toString()
+            const newConversation = {
+              id: conversationId,
+              title: currentInput.trim().slice(0, 30),
+              messages: []
+            }
+            addConversation(newConversation)
+          }
+
+          const userMessage: Message = {
+            id: Date.now().toString(),
+            role: 'user' as const,
+            content: currentInput.trim(),
+          }
+
+          // Add user message
+          addMessage(conversationId, userMessage)
+
+          // Get active prompt
+          const activePrompt = getActivePrompt(store.state)
+          let systemPrompt
+          if (activePrompt) {
+            systemPrompt = {
+              value: activePrompt.content,
+              enabled: true
+            }
+          }
+
+          // Get AI response
+          const response = await genAIResponse({
+            data: {
+              messages: [...messages, userMessage],
+              systemPrompt
+            }
+          })
+
+
+
+          const reader = response.body?.getReader()
+          if (!reader) {
+            throw new Error('No reader found in response')
+          }
+
+          const decoder = new TextDecoder()
+
+          let done = false
+          let newMessage = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant' as const,
+            content: '',
+          }
+          while (!done) {
+            const out = await reader.read()
+            done = out.done
+            if (!done) {
+              try {
+                const json = JSON.parse(decoder.decode(out.value))
+                if (json.type === 'content_block_delta') {
+                  newMessage = {
+                    ...newMessage,
+                    content: newMessage.content + json.delta.text,
+                  }
+                  setPendingMessage(newMessage)
+                }
+              } catch (e) { }
+            }
+          }
+
+          setPendingMessage(null)
+
+          if (newMessage.content.trim()) {
+            addMessage(conversationId, newMessage)
+          }
+        } catch (error) {
+          console.error('Error:', error)
+          Sentry.captureException(error)
+          const errorMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant' as const,
+            content: 'Sorry, I encountered an error processing your request.',
+          }
+          if (currentConversationId) {
+            addMessage(currentConversationId, errorMessage)
+          }
+        } finally {
+          setLoading(false)
+        }
+      }
+    )
   }
 
-  // Update textarea value handler
+  const handleNewChat = () => {
+    const newConversation = {
+      id: Date.now().toString(),
+      title: 'New Chat',
+      messages: []
+    }
+    addConversation(newConversation)
+  }
+
+  const handleDeleteChat = (id: string) => {
+    deleteConversation(id)
+  }
+
+  const handleUpdateChatTitle = (id: string, title: string) => {
+    updateConversationTitle(id, title)
+    setEditingChatId(null)
+  }
+
+  // Handle input change
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value)
   }
 
-  // Show error state if database failed to initialize
-  if (dbError) {
-    return (
-      <div className="flex items-center justify-center h-[calc(100vh-3.5rem)] bg-gray-900">
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold mb-2 text-red-500">Database Error</h2>
-          <p className="text-gray-400">
-            Failed to initialize the database. Please try refreshing the page.
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  // Show loading state while database is initializing
-  if (!isDBReady) {
-    return (
-      <div className="flex items-center justify-center h-[calc(100vh-3.5rem)] bg-gray-900">
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold mb-2 text-white">Loading...</h2>
-          <p className="text-gray-400">
-            Initializing your slightly unstable database... 🔧
-          </p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="relative flex h-screen bg-gray-900">
-      {/* Avatar Dropdown */}
+      {/* Settings Button */}
       <div className="absolute top-5 right-5 z-50">
         <button
-          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-          className="w-10 h-10 rounded-full bg-gradient-to-r from-orange-500 to-red-600 flex items-center justify-center text-white hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-orange-500 overflow-hidden"
+          onClick={() => setIsSettingsOpen(true)}
+          className="w-10 h-10 rounded-full bg-gradient-to-r from-orange-500 to-red-600 flex items-center justify-center text-white hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-orange-500"
         >
-          {!currentConversation && <User className="w-5 h-5" />}
+          <Settings className="w-5 h-5" />
         </button>
-
-        {isDropdownOpen && (
-          <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-gray-800 ring-1 ring-black ring-opacity-5">
-            <div className="py-1" role="menu">
-              <button
-                onClick={() => {
-                  setIsSettingsOpen(true)
-                  setIsDropdownOpen(false)
-                }}
-                className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
-                role="menuitem"
-              >
-                <Settings className="w-4 h-4" />
-                Settings
-              </button>
-              <button
-                onClick={() => {
-                  // Handle logout
-                  setIsDropdownOpen(false)
-                }}
-                className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
-                role="menuitem"
-              >
-                <LogOut className="w-4 h-4" />
-                Logout
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Settings Dialog */}
-      <SettingsDialog
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-      />
-
       {/* Sidebar */}
-      <div className="w-64 bg-gray-800/80 backdrop-blur-sm border-r border-orange-500/10">
-        <div className="flex flex-col h-full">
-          {/* Sidebar Header */}
-          <div className="p-4">
-            <button
-              onClick={chatActions.createNewChat}
-              className="w-full px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-orange-500 to-red-600 rounded-lg hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-orange-500 flex items-center justify-center gap-2"
+      <div className="flex flex-col w-64 bg-gray-800 border-r border-gray-700">
+        <div className="p-4 border-b border-gray-700">
+          <button
+            onClick={handleNewChat}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-orange-500 to-red-600 rounded-lg hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-orange-500 w-full justify-center"
+          >
+            <PlusCircle className="w-4 h-4" />
+            New Chat
+          </button>
+        </div>
+
+        {/* Chat List */}
+        <div className="flex-1 overflow-y-auto">
+          {conversations.map((chat) => (
+            <div
+              key={chat.id}
+              className={`group flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-700/50 ${chat.id === currentConversationId ? 'bg-gray-700/50' : ''
+                }`}
+              onClick={() => setCurrentConversationId(chat.id)}
             >
-              <PlusCircle className="w-4 h-4" />
-              <span>New Chat</span>
-            </button>
-          </div>
-
-          {/* Conversations List */}
-          <div className="flex-1 overflow-y-auto">
-            {conversations.map((conv) => (
-              <div
-                key={conv.id}
-                className="group relative"
-              >
-                <div 
-                  className={`flex items-center gap-3 w-full px-4 py-2 text-left text-sm ${
-                    currentConversationId === conv.id
-                      ? 'bg-gradient-to-r from-orange-500/10 to-red-600/10 text-white'
-                      : 'text-gray-300 hover:bg-gray-700/50'
-                  }`}
-                  onClick={() => chatActions.setCurrentConversationId(conv.id)}
+              <MessageCircle className="w-4 h-4 text-gray-400" />
+              {editingChatId === chat.id ? (
+                <input
+                  type="text"
+                  value={chat.title}
+                  onChange={(e) => handleUpdateChatTitle(chat.id, e.target.value)}
+                  onBlur={() => setEditingChatId(null)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleUpdateChatTitle(chat.id, chat.title)
+                    }
+                  }}
+                  className="flex-1 bg-transparent text-sm text-white focus:outline-none"
+                  autoFocus
+                />
+              ) : (
+                <span className="flex-1 text-sm text-gray-300 truncate">
+                  {chat.title}
+                </span>
+              )}
+              <div className="hidden group-hover:flex items-center gap-1">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setEditingChatId(chat.id)
+                  }}
+                  className="p-1 text-gray-400 hover:text-white"
                 >
-                  <MessageCircle className="w-4 h-4 flex-shrink-0" />
-                  <div className="flex-1 min-w-0 flex items-center gap-2">
-                    {editingChatId === conv.id ? (
-                      <input
-                        type="text"
-                        value={conv.title}
-                        onChange={(e) => chatActions.updateChatTitle(conv.id, e.target.value)}
-                        onBlur={() => setEditingChatId(null)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            setEditingChatId(null)
-                          }
-                        }}
-                        className="w-full bg-gray-700 border-none focus:outline-none focus:ring-1 focus:ring-orange-500 rounded px-1"
-                        autoFocus
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    ) : (
-                      <>
-                        <span className="truncate flex-1">{conv.title}</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setEditingChatId(conv.id)
-                          }}
-                          className="p-1 text-gray-400 hover:text-orange-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      chatActions.deleteChat(conv.id)
-                    }}
-                    className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Delete conversation"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                  <Edit2 className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDeleteChat(chat.id)
+                  }}
+                  className="p-1 text-gray-400 hover:text-red-500"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
               </div>
-            ))}
-          </div>
-
-          {conversations.length > 0 && (
-            <div className="p-4 border-t border-orange-500/10">
-              <button
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to clear all chats? This cannot be undone.')) {
-                    chatActions.clearAllChats()
-                  }
-                }}
-                className="w-full px-4 py-2 text-sm font-medium text-red-500 bg-red-500/10 rounded-lg hover:bg-red-500/20 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 flex items-center justify-center gap-2"
-              >
-                <Trash2 className="w-4 h-4" />
-                Clear All Chats
-              </button>
             </div>
-          )}
+          ))}
         </div>
       </div>
 
-      {/* Main chat area */}
-      <div className="flex-1 flex flex-col transition-all duration-300 relative">
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
         {currentConversationId ? (
           <>
-            <div className="flex-1 overflow-y-auto pb-24">
+            {/* Messages */}
+            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto pb-24">
               <div className="max-w-3xl mx-auto w-full px-4">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`py-6 ${message.role === 'assistant'
-                        ? 'bg-gradient-to-r from-orange-500/5 to-red-600/5'
-                        : 'bg-transparent'
+              {[...messages, pendingMessage]
+                  .filter((v) => v)
+                  .map((message) => (
+                    <div
+                      key={message!.id}
+                      className={`py-6 ${
+                        message!.role === 'assistant'
+                          ? 'bg-gradient-to-r from-orange-500/5 to-red-600/5'
+                          : 'bg-transparent'
                       }`}
-                  >
-                    <div className="flex items-start gap-4 max-w-3xl mx-auto w-full">
-                      {message.role === 'assistant' ? (
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-orange-500 to-red-600 mt-2 flex items-center justify-center text-sm font-medium text-white flex-shrink-0">
-                          AI
-                        </div>
-                      ) : (
-                        <div className="w-8 h-8 rounded-lg bg-gray-700 flex items-center justify-center text-sm font-medium text-white flex-shrink-0">
-                          Y
-                        </div>
-                      )}
+                    >
+                      <div className="flex items-start gap-4 max-w-3xl mx-auto w-full">
+                        {message!.role === 'assistant' ? (
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-orange-500 to-red-600 mt-2 flex items-center justify-center text-sm font-medium text-white flex-shrink-0">
+                            AI
+                          </div>
+                        ) : (
+                          <div className="w-8 h-8 rounded-lg bg-gray-700 flex items-center justify-center text-sm font-medium text-white flex-shrink-0">
+                            Y
+                          </div>
+                        )}
                       <div className="flex-1 min-w-0">
                         <ReactMarkdown
                           className="prose dark:prose-invert max-w-none"
                           rehypePlugins={[rehypeRaw, rehypeSanitize, rehypeHighlight]}
                         >
-                          {message.content}
+                          {message!.content}
                         </ReactMarkdown>
                       </div>
                     </div>
@@ -275,14 +314,12 @@ function Home() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3">
-                          <div className="text-gray-400 font-medium text-lg">Thinking</div>
-                          <div className="flex gap-2">
-                            <div className="w-2 h-2 rounded-full bg-orange-500 animate-[bounce_0.8s_infinite]" style={{ animationDelay: '0ms' }}></div>
-                            <div className="w-2 h-2 rounded-full bg-orange-500 animate-[bounce_0.8s_infinite]" style={{ animationDelay: '200ms' }}></div>
-                            <div className="w-2 h-2 rounded-full bg-orange-500 animate-[bounce_0.8s_infinite]" style={{ animationDelay: '400ms' }}></div>
-                          </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-gray-400 font-medium text-lg">Thinking</div>
+                        <div className="flex gap-2">
+                          <div className="w-2 h-2 rounded-full bg-orange-500 animate-[bounce_0.8s_infinite]" style={{ animationDelay: '0ms' }}></div>
+                          <div className="w-2 h-2 rounded-full bg-orange-500 animate-[bounce_0.8s_infinite]" style={{ animationDelay: '200ms' }}></div>
+                          <div className="w-2 h-2 rounded-full bg-orange-500 animate-[bounce_0.8s_infinite]" style={{ animationDelay: '400ms' }}></div>
                         </div>
                       </div>
                     </div>
@@ -291,16 +328,22 @@ function Home() {
               </div>
             </div>
 
-            <div className="absolute bottom-0 inset-x-0 bg-gray-900/80 backdrop-blur-sm border-t border-orange-500/10">
+            {/* Input */}
+            <div className="absolute bottom-0 right-0 left-64 bg-gray-900/80 backdrop-blur-sm border-t border-orange-500/10">
               <div className="max-w-3xl mx-auto w-full px-4 py-3">
                 <form onSubmit={handleSubmit}>
                   <div className="relative">
                     <textarea
                       value={input}
                       onChange={handleInputChange}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          handleSubmit(e)
+                        }
+                      }}
                       placeholder="Type something clever (or don't, we won't judge)..."
-                      className="w-full rounded-lg border border-orange-500/20 bg-gray-800/50 pl-4 pr-12 py-3 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-transparent resize-none overflow-hidden"
-                      disabled={isLoading}
+                      className="w-full rounded-lg border border-orange-500/20 bg-gray-800/50 pl-4 pr-12 py-3 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-transparent resize-none overflow-hidden shadow-lg"
                       rows={1}
                       style={{ minHeight: '44px', maxHeight: '200px' }}
                       onInput={(e) => {
@@ -308,16 +351,10 @@ function Home() {
                         target.style.height = 'auto';
                         target.style.height = Math.min(target.scrollHeight, 200) + 'px';
                       }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSubmit(e as any);
-                        }
-                      }}
                     />
                     <button
                       type="submit"
-                      disabled={isLoading}
+                      disabled={!input.trim() || isLoading}
                       className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-orange-500 hover:text-orange-400 disabled:text-gray-500 transition-colors focus:outline-none"
                     >
                       <Send className="w-4 h-4" />
@@ -341,26 +378,20 @@ function Home() {
                   <textarea
                     value={input}
                     onChange={handleInputChange}
-                    placeholder="Type something clever (or don't, we won't judge)..."
-                    className="w-full rounded-lg border border-orange-500/20 bg-gray-800/50 pl-4 pr-12 py-3 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-transparent resize-none overflow-hidden"
-                    disabled={isLoading}
-                    rows={1}
-                    style={{ minHeight: '88px', maxHeight: '200px' }}
-                    onInput={(e) => {
-                      const target = e.target as HTMLTextAreaElement;
-                      target.style.height = 'auto';
-                      target.style.height = Math.min(target.scrollHeight, 200) + 'px';
-                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSubmit(e as any);
+                        e.preventDefault()
+                        handleSubmit(e)
                       }
                     }}
+                    placeholder="Type something clever (or don't, we won't judge)..."
+                    className="w-full rounded-lg border border-orange-500/20 bg-gray-800/50 pl-4 pr-12 py-3 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-transparent resize-none overflow-hidden"
+                    rows={1}
+                    style={{ minHeight: '88px' }}
                   />
                   <button
                     type="submit"
-                    disabled={isLoading}
+                    disabled={!input.trim() || isLoading}
                     className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-orange-500 hover:text-orange-400 disabled:text-gray-500 transition-colors focus:outline-none"
                   >
                     <Send className="w-4 h-4" />
@@ -371,6 +402,16 @@ function Home() {
           </div>
         )}
       </div>
+
+      {/* Settings Dialog */}
+      <SettingsDialog
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
     </div>
   )
 }
+
+export const Route = createFileRoute('/')({
+  component: Home
+})

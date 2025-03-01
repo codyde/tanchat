@@ -2,6 +2,18 @@
 import { createRouter as createTanStackRouter } from '@tanstack/react-router'
 import { routeTree } from './routeTree.gen'
 import * as Sentry from '@sentry/react'
+import { createIsomorphicFn } from '@tanstack/start'
+
+createIsomorphicFn().server(() => {
+  console.log('Sentry init')
+  Sentry.init({
+      dsn: import.meta.env.VITE_SENTRY_DSN,
+      tracesSampleRate: 1.0,
+      profilesSampleRate: 1.0,
+  })
+}).client(() => {
+  console.log('Sentry init client')
+})()
 
 export function createRouter() {
   const router = createTanStackRouter({

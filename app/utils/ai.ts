@@ -1,11 +1,13 @@
-import { createServerFn } from '@tanstack/start'
+import { createServerFn } from '@tanstack/react-start'  
 import { Anthropic } from '@anthropic-ai/sdk'
+
 import * as Sentry from '@sentry/react'
-// import loggingMiddleware from '../middleware'
+import * as SentryServer from '@sentry/node'
+
 export interface Message {
-    id: string
-    role: 'user' | 'assistant'
-    content: string
+  id: string
+  role: 'user' | 'assistant'
+  content: string
 }
 
 const DEFAULT_SYSTEM_PROMPT = `You are TanStack Chat, an AI assistant using Markdown for clear and structured responses. Format your responses following these guidelines:
@@ -51,60 +53,73 @@ const DEFAULT_SYSTEM_PROMPT = `You are TanStack Chat, an AI assistant using Mark
 Keep responses concise and well-structured. Use appropriate Markdown formatting to enhance readability and understanding.`;
 
 // Non-streaming implementation
-export const genAIResponse = createServerFn({ method: 'GET' })
-   
+export const genAIResponse = createServerFn({ method: 'GET', response: 'raw' })
     .validator((d: { 
         messages: Message[], 
         systemPrompt?: { value: string, enabled: boolean },
-        streamEnabled?: boolean 
     }) => d)
-    // .middleware([loggingMiddleware])
     .handler(async ({ data }) => {
-        const anthropic = new Anthropic({
-            apiKey: process.env.ANTHROPIC_API_KEY || '',
-        });
+      console.log(data)
+        return await SentryServer.startSpan(
+            { 
+                name: "AI Response Generation",
+                op: "ai.generate"
+            },
+            async () => {
+                const anthropic = new Anthropic({
+                    apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY || '',
+                });
 
-        // Filter out error messages and empty messages
-        const formattedMessages = data.messages
-            .filter(msg => msg.content.trim() !== '' && !msg.content.startsWith('Sorry, I encountered an error'))
-            .map(msg => ({
-                role: msg.role,
-                content: msg.content.trim()
-            }));
+                // Filter out error messages and empty messages
+                const formattedMessages = data.messages
+                    .filter(msg => msg.content.trim() !== '' && !msg.content.startsWith('Sorry, I encountered an error'))
+                    .map(msg => ({
+                        role: msg.role,
+                        content: msg.content.trim()
+                    }));
 
-        if (formattedMessages.length === 0) {
-            return { error: 'No valid messages to send' };
-        }
+                if (formattedMessages.length === 0) {
+                    return new Response(JSON.stringify({ error: 'No valid messages to send' }), {
+                        headers: { 'Content-Type': 'application/json' },
+                        status: 400
+                    });
+                }
 
-        const systemPrompt = data.systemPrompt?.enabled 
-            ? `${DEFAULT_SYSTEM_PROMPT}\n\n${data.systemPrompt.value}`
-            : DEFAULT_SYSTEM_PROMPT;
+                const systemPrompt = data.systemPrompt?.enabled 
+                    ? `${DEFAULT_SYSTEM_PROMPT}\n\n${data.systemPrompt.value}`
+                    : DEFAULT_SYSTEM_PROMPT;
 
-        // Debug log to verify prompt layering
-        console.log('System Prompt Configuration:', {
-            hasCustomPrompt: data.systemPrompt?.enabled,
-            customPromptValue: data.systemPrompt?.value,
-            finalPrompt: systemPrompt
-        });
+                // Debug log to verify prompt layering
+                console.log('System Prompt Configuration:', {
+                    hasCustomPrompt: data.systemPrompt?.enabled,
+                    customPromptValue: data.systemPrompt?.value,
+                    finalPrompt: systemPrompt
+                });
 
-        try {
-            const response = await anthropic.messages.create({
-                model: "claude-3-5-sonnet-20241022",
-                max_tokens: 4096,
-                system: systemPrompt,
-                messages: formattedMessages,
-            });
+                try {
+                    const response = await anthropic.messages.stream({
+                        model: "claude-3-5-sonnet-20241022",
+                        max_tokens: 4096,
+                        system: systemPrompt,
+                        messages: formattedMessages,
+                    });
 
-            if (response.content[0].type === 'text') {
-                return { text: response.content[0].text };
+                    return new Response(response.toReadableStream())
+                } catch (error) {
+                    console.error('Error in genAIResponse:', error);
+                    Sentry.captureException(error);
+                    
+                    const errorMessage = error instanceof Error 
+                        ? (error.message.includes('rate limit') 
+                            ? 'Rate limit exceeded. Please try again in a moment.'
+                            : error.message)
+                        : 'Failed to get AI response';
+                        
+                    return new Response(JSON.stringify({ error: errorMessage }), {
+                        headers: { 'Content-Type': 'application/json' },
+                        status: 500
+                    });
+                }
             }
-            return { error: 'Unexpected response type' };
-        } catch (error) {
-            console.error('Error in genAIResponse:', error);
-            Sentry.captureException(error);
-            if (error instanceof Error && error.message.includes('rate limit')) {
-                return { error: 'Rate limit exceeded. Please try again in a moment.' };
-            }
-            return { error: error instanceof Error ? error.message : 'Failed to get AI response' };
-        }
+        );
     });
