@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState, useRef } from 'react'
-import { PlusCircle, MessageCircle, ChevronLeft, ChevronRight, Trash2, X, Menu, Send, Settings, User, LogOut, Edit2 } from 'lucide-react'
+import { PlusCircle, MessageCircle, ChevronLeft, ChevronRight, Trash2, X, Menu, Send, Settings, User, LogOut, Edit2, ChevronDown } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize from 'rehype-sanitize'
@@ -10,6 +10,52 @@ import { useAppState } from '../store/hooks'
 import { store } from '../store/store'
 import { genAIResponse, type Message } from '../utils/ai'
 import * as Sentry from '@sentry/react'
+
+// Define available models
+const MODELS = [
+  { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet" },
+  { id: "claude-3-7-sonnet-20250219", name: "Claude 3.7 Sonnet" }
+]
+
+function ModelSelector({ className = "" }) {
+  const { selectedModel, setSelectedModel } = useAppState()
+  const [isOpen, setIsOpen] = useState(false)
+  
+  const selectedModelData = MODELS.find(m => m.id === selectedModel) || MODELS[1]
+  
+  return (
+    <div className={`relative ${className} my-[2px]`} >
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-1 text-xs text-gray-400 hover:text-orange-500 transition-colors"
+      >
+        <span>{selectedModelData.name}</span>
+        <ChevronDown className="w-3 h-3" />
+      </button>
+      
+      {isOpen && (
+        <div className="absolute bottom-full left-0 mb-1 bg-gray-800 border border-gray-700 rounded-md shadow-lg overflow-hidden z-10">
+          {MODELS.map(model => (
+            <button
+              key={model.id}
+              onClick={() => {
+                setSelectedModel(model.id)
+                setIsOpen(false)
+              }}
+              className={`w-full text-left px-3 py-2 text-xs ${
+                selectedModel === model.id
+                  ? 'bg-gradient-to-r from-orange-500/20 to-red-600/20 text-orange-500'
+                  : 'text-gray-300 hover:bg-gray-700'
+              }`}
+            >
+              {model.name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function Home() {
   const {
@@ -23,7 +69,8 @@ function Home() {
     addMessage,
     setLoading,
     getCurrentConversation,
-    getActivePrompt
+    getActivePrompt,
+    selectedModel
   } = useAppState()
 
   const currentConversation = getCurrentConversation(store.state)
@@ -103,7 +150,8 @@ function Home() {
           const response = await genAIResponse({
             data: {
               messages: [...messages, userMessage],
-              systemPrompt
+              systemPrompt,
+              model: selectedModel
             }
           })
 
@@ -356,9 +404,11 @@ function Home() {
                       type="submit"
                       disabled={!input.trim() || isLoading}
                       className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-orange-500 hover:text-orange-400 disabled:text-gray-500 transition-colors focus:outline-none"
+                      style={{ transform: 'translateY(-50%)', top: '50%' }}
                     >
                       <Send className="w-4 h-4" />
                     </button>
+                    <ModelSelector className="absolute left-2 bottom-0" />
                   </div>
                 </form>
               </div>
@@ -393,9 +443,11 @@ function Home() {
                     type="submit"
                     disabled={!input.trim() || isLoading}
                     className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-orange-500 hover:text-orange-400 disabled:text-gray-500 transition-colors focus:outline-none"
+                    style={{ transform: 'translateY(-50%)', top: '50%' }}
                   >
                     <Send className="w-4 h-4" />
                   </button>
+                  <ModelSelector className="absolute left-2 bottom-0" />
                 </div>
               </form>
             </div>

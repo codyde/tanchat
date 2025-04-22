@@ -57,6 +57,7 @@ export const genAIResponse = createServerFn({ method: 'GET', response: 'raw' })
     .validator((d: { 
         messages: Message[], 
         systemPrompt?: { value: string, enabled: boolean },
+        model?: string
     }) => d)
     .handler(async ({ data }) => {
       console.log(data)
@@ -98,7 +99,7 @@ export const genAIResponse = createServerFn({ method: 'GET', response: 'raw' })
 
                 try {
                     const response = await anthropic.messages.stream({
-                        model: "claude-3-5-sonnet-20241022",
+                        model: data.model || "claude-3-7-sonnet-20250219",
                         max_tokens: 4096,
                         system: systemPrompt,
                         messages: formattedMessages,
