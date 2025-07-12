@@ -1,0 +1,1 @@
+{"version":3,"file":"debug.js","sources":["../../src/debug.ts"],"sourcesContent":["export const debug =\n  process.env.TSR_VITE_DEBUG &&\n  ['true', 'start-plugin-core'].includes(process.env.TSR_VITE_DEBUG)\n"],"names":[],"mappings":"AAAa,MAAA,QACX,QAAQ,IAAI,kBACZ,CAAC,QAAQ,mBAAmB,EAAE,SAAS,QAAQ,IAAI,cAAc;"}

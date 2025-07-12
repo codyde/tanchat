@@ -1,0 +1,1 @@
+{"version":3,"file":"server.js","sources":["../../src/server.tsx"],"sourcesContent":["console.warn(\n  '[@tanstack/start] Warning: This package has moved to @tanstack/react-start. Please switch to the new package, as this package will be dropped soon.',\n)\nexport * from '@tanstack/react-start-server'\n"],"names":[],"mappings":";AAAA,QAAQ;AAAA,EACN;AACF;"}
