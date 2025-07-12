@@ -6,15 +6,17 @@ Am example chat application built with TanStack Start, TanStack Store, and Claud
 
 ```env
 ANTHROPIC_API_KEY=your_anthropic_api_key
+OPENAI_API_KEY=your_openai_api_key
 ```
 
 ## ✨ Features
 
 ### AI Capabilities
-- 🤖 Powered by Claude 3.5 Sonnet 
+- 🤖 Multi-provider AI support: Anthropic Claude and OpenAI models
+- 🧠 Advanced reasoning models: Claude 4/3.7 Sonnet, OpenAI o3/o3-pro/o3-mini
 - 📝 Rich markdown formatting with syntax highlighting
 - 🎯 Customizable system prompts for tailored AI behavior
-- 🔄 Real-time message updates and streaming responses (coming soon)
+- 🔄 Real-time streaming responses with AI SDK v5
 
 ### User Experience
 - 🎨 Modern UI with Tailwind CSS and Lucide icons
@@ -91,6 +93,7 @@ Create a `.env` file in the root directory with the following variables:
 ```env
 VITE_SENTRY_DSN=your_sentry_dsn
 ANTHROPIC_API_KEY=your_anthropic_api_key
+OPENAI_API_KEY=your_openai_api_key
 ```
 
 ## Prerequisites
@@ -121,6 +124,7 @@ Before you begin, ensure you have the following installed:
    ```env
    VITE_SENTRY_DSN=your_sentry_dsn
    ANTHROPIC_API_KEY=your_anthropic_api_key
+   OPENAI_API_KEY=your_openai_api_key
    ```
 
 4. Start the development server:
