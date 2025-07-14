@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { PlusCircle, Trash2 } from 'lucide-react'
+import { PlusCircle, Trash2, RotateCcw } from 'lucide-react'
 import { useAppState, type Prompt } from '../store/hooks'
+import { ThemeSelector } from './ThemeSelector'
 
 interface SettingsDialogProps {
   isOpen: boolean
@@ -10,7 +11,7 @@ interface SettingsDialogProps {
 export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
   const [promptForm, setPromptForm] = useState({ name: '', content: '' })
   const [isAddingPrompt, setIsAddingPrompt] = useState(false)
-  const { prompts, createPrompt, deletePrompt, setPromptActive } = useAppState()
+  const { prompts, createPrompt, deletePrompt, setPromptActive, clearSettings } = useAppState()
 
   const handleAddPrompt = () => {
     if (!promptForm.name.trim() || !promptForm.content.trim()) return
@@ -31,13 +32,13 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center" onClick={(e) => {
       if (e.target === e.currentTarget) handleClose()
     }}>
-      <div className="bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div className="theme-bg-surface rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto theme-transition" onClick={e => e.stopPropagation()}>
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-semibold text-white">Settings</h2>
+            <h2 className="text-2xl font-semibold theme-text-primary">Settings</h2>
             <button
               onClick={handleClose}
-              className="text-gray-400 hover:text-white focus:outline-none"
+              className="theme-text-muted hover:theme-text-primary focus:outline-none"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -46,10 +47,13 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
           </div>
           
           <div className="space-y-6">
+            {/* Theme Selection */}
+            <ThemeSelector />
+            
             {/* Prompts Management */}
             <div className="space-y-2">
               <div className="flex items-center justify-between mb-4">
-                <label className="block text-sm font-medium text-white">
+                <label className="block text-sm font-medium theme-text-primary">
                   System Prompts
                 </label>
                 <button
@@ -123,6 +127,29 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
               <p className="text-xs text-gray-400">
                 Create and manage custom system prompts. Only one prompt can be active at a time.
               </p>
+            </div>
+
+            {/* Clear Settings Section */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-white">
+                Reset Settings
+              </label>
+              <div className="p-3 bg-gray-700/50 rounded-lg">
+                <p className="text-xs text-gray-400 mb-3">
+                  Clear all saved settings including model selection and reasoning configuration. This will reset everything to defaults.
+                </p>
+                <button
+                  onClick={() => {
+                    if (confirm('Are you sure you want to clear all settings? This cannot be undone.')) {
+                      clearSettings()
+                    }
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Clear All Settings
+                </button>
+              </div>
             </div>
 
           </div>

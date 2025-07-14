@@ -1,5 +1,7 @@
 import { Store } from '@tanstack/store'
 import type { Message } from '../utils/ai'
+import { loadSettings, saveSelectedModel, saveReasoningConfig, saveSelectedTheme } from '../utils/localStorage'
+import { defaultTheme } from '../utils/themes'
 
 // Types
 export interface Prompt {
@@ -16,18 +18,41 @@ export interface Conversation {
   messages: Message[]
 }
 
+export interface AIModel {
+  id: string
+  name: string
+  provider: string
+}
+
+export interface ReasoningConfig {
+  reasoningEffort: 'low' | 'medium' | 'high'
+  reasoningSummary: 'auto' | 'detailed' | 'none'
+}
+
 export interface State {
   prompts: Prompt[]
   conversations: Conversation[]
   currentConversationId: string | null
   isLoading: boolean
+  selectedModel: string
+  reasoningConfig: ReasoningConfig
+  selectedTheme: string
 }
+
+// Load persisted settings
+const persistedSettings = loadSettings()
 
 const initialState: State = {
   prompts: [],
   conversations: [],
   currentConversationId: null,
-  isLoading: false
+  isLoading: false,
+  selectedModel: persistedSettings.selectedModel || 'grok-4',
+  reasoningConfig: persistedSettings.reasoningConfig || {
+    reasoningEffort: 'medium',
+    reasoningSummary: 'none'
+  },
+  selectedTheme: persistedSettings.selectedTheme || defaultTheme.id
 }
 
 export const store = new Store<State>(initialState)
@@ -118,6 +143,55 @@ export const actions = {
 
   setLoading: (isLoading: boolean) => {
     store.setState(state => ({ ...state, isLoading }))
+  },
+
+  setSelectedModel: (modelId: string) => {
+    store.setState(state => ({ ...state, selectedModel: modelId }))
+    saveSelectedModel(modelId) // Persist to localStorage
+  },
+
+  // Reasoning config actions
+  setReasoningConfig: (config: ReasoningConfig) => {
+    store.setState(state => ({ ...state, reasoningConfig: config }))
+    saveReasoningConfig(config) // Persist to localStorage
+  },
+
+  setReasoningEffort: (effort: 'low' | 'medium' | 'high') => {
+    store.setState(state => {
+      const newConfig = { ...state.reasoningConfig, reasoningEffort: effort }
+      saveReasoningConfig(newConfig) // Persist to localStorage
+      return { ...state, reasoningConfig: newConfig }
+    })
+  },
+
+  setReasoningSummary: (summary: 'auto' | 'detailed' | 'none') => {
+    store.setState(state => {
+      const newConfig = { ...state.reasoningConfig, reasoningSummary: summary }
+      saveReasoningConfig(newConfig) // Persist to localStorage
+      return { ...state, reasoningConfig: newConfig }
+    })
+  },
+
+  // Theme actions
+  setSelectedTheme: (themeId: string) => {
+    store.setState(state => ({ ...state, selectedTheme: themeId }))
+    saveSelectedTheme(themeId) // Persist to localStorage
+  },
+
+  // Clear settings action
+  clearSettings: () => {
+    store.setState(state => ({
+      ...state,
+      selectedModel: 'grok-4',
+      reasoningConfig: {
+        reasoningEffort: 'medium',
+        reasoningSummary: 'none'
+      },
+      selectedTheme: defaultTheme.id
+    }))
+    // Clear from localStorage
+    const { clearSettings } = require('../utils/localStorage')
+    clearSettings()
   }
 }
 
@@ -129,5 +203,10 @@ export const selectors = {
   getPrompts: (state: State) => state.prompts,
   getConversations: (state: State) => state.conversations,
   getCurrentConversationId: (state: State) => state.currentConversationId,
-  getIsLoading: (state: State) => state.isLoading
+  getIsLoading: (state: State) => state.isLoading,
+  getSelectedModel: (state: State) => state.selectedModel,
+  getReasoningConfig: (state: State) => state.reasoningConfig,
+  getReasoningEffort: (state: State) => state.reasoningConfig.reasoningEffort,
+  getReasoningSummary: (state: State) => state.reasoningConfig.reasoningSummary,
+  getSelectedTheme: (state: State) => state.selectedTheme
 } 

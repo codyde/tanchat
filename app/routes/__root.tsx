@@ -3,9 +3,10 @@ import {
   Outlet,
   createRootRoute,
 } from '@tanstack/react-router'
-import { Meta, Scripts } from '@tanstack/start'
+import { Meta, Scripts } from '@tanstack/react-start'
 import type { ReactNode } from 'react'
 import indexCss from '../index.css?url'
+import { ThemeProvider } from '../contexts/ThemeContext'
 
 export const Route = createRootRoute({
   head: () => ({
@@ -35,7 +36,9 @@ export const Route = createRootRoute({
 function RootComponent() {
   return (
     <RootDocument>
-      <Outlet />
+      <ThemeProvider>
+        <Outlet />
+      </ThemeProvider>
     </RootDocument>
   )
 }
@@ -46,7 +49,7 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
       <head>
         <Meta />
       </head>
-      <body className="bg-gray-900 text-gray-100 min-h-screen">
+      <body className="min-h-screen">
         <main className="flex-1">
           {children}
         </main>

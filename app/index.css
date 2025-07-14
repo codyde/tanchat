@@ -1,6 +1,27 @@
 @import "tailwindcss";
 @import "highlight.js/styles/github-dark.css";
 
+/* Theme CSS Variables */
+:root {
+  /* Default theme colors (dark theme) */
+  --theme-background: #0f0f0f;
+  --theme-surface: #1a1a1a;
+  --theme-surfaceHover: #2a2a2a;
+  --theme-textPrimary: #ffffff;
+  --theme-textSecondary: #d1d5db;
+  --theme-textMuted: #9ca3af;
+  --theme-accent: #3b82f6;
+  --theme-accentHover: #2563eb;
+  --theme-border: #374151;
+  --theme-borderHover: #4b5563;
+  --theme-success: #10b981;
+  --theme-warning: #f59e0b;
+  --theme-error: #ef4444;
+  --theme-userMessage: #1e40af;
+  --theme-aiMessage: #1a1a1a;
+  --theme-codeBlock: #111827;
+}
+
 /* Custom scrollbar styles */
 ::-webkit-scrollbar {
   width: 8px;
@@ -19,15 +40,21 @@
   background-color: rgba(156, 163, 175, 0.7);
 }
 
-/* Smooth transitions for dark mode */
+/* Smooth transitions for theme changes */
 html {
   transition: background-color 0.3s ease;
+}
+
+/* Apply theme colors to body */
+body {
+  background-color: var(--theme-background);
+  color: var(--theme-textPrimary);
 }
 
 /* Markdown content styles */
 .prose {
   max-width: none;
-  color: #e5e7eb; /* text-gray-200 */
+  color: var(--theme-textSecondary);
 }
 
 /* .prose p {
@@ -36,15 +63,15 @@ html {
 } */
 
 .prose code {
-  color: #e5e7eb;
-  background-color: rgba(31, 41, 55, 0.5);
+  color: var(--theme-textSecondary);
+  background-color: var(--theme-codeBlock);
   padding: 0.2em 0.4em;
   border-radius: 0.375rem;
   font-size: 0.875em;
 }
 
 .prose pre {
-  background-color: rgba(31, 41, 55, 0.5);
+  background-color: var(--theme-codeBlock);
   border-radius: 0.5rem;
   padding: 1rem;
   margin: 1.25em 0;
@@ -59,7 +86,7 @@ html {
 }
 
 .prose h1, .prose h2, .prose h3, .prose h4 {
-  color: #f9fafb; /* text-gray-50 */
+  color: var(--theme-textPrimary);
   /* margin-top: 2em; */
   /* margin-bottom: 1em; */
 }
@@ -76,27 +103,27 @@ html {
 }
 
 .prose blockquote {
-  border-left-color: #f97316; /* orange-500 */
-  background-color: rgba(249, 115, 22, 0.1);
+  border-left-color: var(--theme-accent);
+  background-color: color-mix(in srgb, var(--theme-accent) 10%, transparent);
   padding: 1em;
   margin: 1.25em 0;
   border-radius: 0.5rem;
 }
 
 .prose hr {
-  border-color: rgba(249, 115, 22, 0.2);
+  border-color: color-mix(in srgb, var(--theme-accent) 20%, transparent);
   margin: 2em 0;
 }
 
 .prose a {
-  color: #f97316; /* orange-500 */
+  color: var(--theme-accent);
   text-decoration: underline;
   text-decoration-thickness: 0.1em;
   text-underline-offset: 0.2em;
 }
 
 .prose a:hover {
-  color: #fb923c; /* orange-400 */
+  color: var(--theme-accentHover);
 }
 
 .prose table {
@@ -107,11 +134,11 @@ html {
 
 .prose th, .prose td {
   padding: 0.75em;
-  border: 1px solid rgba(249, 115, 22, 0.2);
+  border: 1px solid color-mix(in srgb, var(--theme-accent) 20%, transparent);
 }
 
 .prose th {
-  background-color: rgba(249, 115, 22, 0.1);
+  background-color: color-mix(in srgb, var(--theme-accent) 10%, transparent);
   font-weight: 600;
 }
 
@@ -173,16 +200,16 @@ html {
 
 .prose th,
 .prose td {
-  border: 1px solid rgba(249, 115, 22, 0.2);
+  border: 1px solid color-mix(in srgb, var(--theme-accent) 20%, transparent);
   padding: 0.5em;
 }
 
 .prose th {
-  background-color: rgba(249, 115, 22, 0.1);
+  background-color: color-mix(in srgb, var(--theme-accent) 10%, transparent);
 }
 
 .prose strong {
-  color: #f9fafb; /* text-gray-50 */
+  color: var(--theme-textPrimary);
   font-weight: 600;
 }
 
@@ -191,23 +218,23 @@ html {
 }
 
 .prose blockquote {
-  border-left: 4px solid #f97316; /* orange-500 */
+  border-left: 4px solid var(--theme-accent);
   padding-left: 1em;
   margin: 1em 0;
-  color: #d1d5db; /* text-gray-300 */
+  color: var(--theme-textSecondary);
 }
 
 /* Ensure code blocks match the AI's formatting */
 .prose code {
-  color: #e5e7eb;
-  background-color: rgba(31, 41, 55, 0.5);
+  color: var(--theme-textSecondary);
+  background-color: var(--theme-codeBlock);
   padding: 0.2em 0.4em;
   border-radius: 0.375rem;
   font-size: 0.875em;
 }
 
 .prose pre {
-  background-color: rgba(31, 41, 55, 0.5);
+  background-color: var(--theme-codeBlock);
   border-radius: 0.5rem;
   padding: 1rem;
   margin: 1em 0;
@@ -217,4 +244,79 @@ html {
   background-color: transparent;
   padding: 0;
   border-radius: 0;
+}
+
+/* Theme-aware utility classes */
+.theme-bg-primary {
+  background-color: var(--theme-background);
+}
+
+.theme-bg-surface {
+  background-color: var(--theme-surface);
+}
+
+.theme-bg-surface-hover {
+  background-color: var(--theme-surfaceHover);
+}
+
+.theme-text-primary {
+  color: var(--theme-textPrimary);
+}
+
+.theme-text-secondary {
+  color: var(--theme-textSecondary);
+}
+
+.theme-text-muted {
+  color: var(--theme-textMuted);
+}
+
+.theme-accent {
+  color: var(--theme-accent);
+}
+
+.theme-bg-accent {
+  background-color: var(--theme-accent);
+}
+
+.theme-bg-accent-hover {
+  background-color: var(--theme-accentHover);
+}
+
+.theme-border {
+  border-color: var(--theme-border);
+}
+
+.theme-border-hover {
+  border-color: var(--theme-borderHover);
+}
+
+.theme-bg-user-message {
+  background-color: var(--theme-userMessage);
+}
+
+.theme-bg-ai-message {
+  background-color: var(--theme-aiMessage);
+}
+
+.theme-bg-code-block {
+  background-color: var(--theme-codeBlock);
+}
+
+/* Transitions for smooth theme changes */
+.theme-transition {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Theme-aware placeholder text */
+.theme-placeholder::placeholder {
+  color: var(--theme-textMuted);
+  opacity: 0.7;
+}
+
+/* Theme-aware focus ring */
+.theme-focus:focus {
+  outline: none;
+  border-color: var(--theme-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-accent) 20%, transparent);
 }
