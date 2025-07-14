@@ -1,0 +1,34 @@
+function createMiddleware(options, __opts) {
+  const resolvedOptions = __opts || (options || {});
+  return {
+    options: resolvedOptions,
+    middleware: (middleware) => {
+      return createMiddleware(
+        void 0,
+        Object.assign(resolvedOptions, { middleware })
+      );
+    },
+    validator: (validator) => {
+      return createMiddleware(
+        void 0,
+        Object.assign(resolvedOptions, { validator })
+      );
+    },
+    client: (client) => {
+      return createMiddleware(
+        void 0,
+        Object.assign(resolvedOptions, { client })
+      );
+    },
+    server: (server) => {
+      return createMiddleware(
+        void 0,
+        Object.assign(resolvedOptions, { server })
+      );
+    }
+  };
+}
+export {
+  createMiddleware
+};
+//# sourceMappingURL=createMiddleware.js.map

@@ -1,7 +1,7 @@
 import { useStore } from '@tanstack/react-store'
 import { store, actions, selectors } from './store'
 
-export type { State, Prompt, Conversation } from './store'
+export type { State, Prompt, Conversation, ReasoningConfig } from './store'
 
 export function useAppState() {
   const state = useStore(store)
