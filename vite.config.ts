@@ -12,7 +12,10 @@ export default defineConfig({
     tailwindcss(),
   ],
   server: {
-    port: 3000
+    port: 3000,
+    hmr: {
+      overlay: false
+    }
   },
   optimizeDeps: {
     exclude: ['better-sqlite3']
