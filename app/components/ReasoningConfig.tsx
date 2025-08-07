@@ -9,10 +9,10 @@ interface ReasoningConfigProps {
 export function ReasoningConfig({ className = '' }: ReasoningConfigProps) {
   const { selectedModel, reasoningConfig, setReasoningEffort, setReasoningSummary } = useAppState()
   
-  // Only show for reasoning models
+  // Only show for reasoning models - grok-4 does NOT support reasoning
   const isReasoningModel = selectedModel === 'o3-mini' || selectedModel.startsWith('o1-') || selectedModel === 'grok-3-mini'
   const isOpenAIReasoningModel = selectedModel === 'o3-mini' || selectedModel.startsWith('o1-')
-  const isGrokReasoningModel = selectedModel === 'grok-3-mini'
+  const isGrokReasoningModel = selectedModel === 'grok-3-mini' // Only grok-3-mini, NOT grok-4
   
   if (!isReasoningModel) {
     return null

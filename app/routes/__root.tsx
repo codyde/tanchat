@@ -2,8 +2,9 @@
 import {
   Outlet,
   createRootRoute,
+  HeadContent,
+  Scripts
 } from '@tanstack/react-router'
-import { Meta, Scripts } from '@tanstack/react-start'
 import type { ReactNode } from 'react'
 import indexCss from '../index.css?url'
 import { ThemeProvider } from '../contexts/ThemeContext'
@@ -47,7 +48,7 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html>
       <head>
-        <Meta />
+        <HeadContent />
       </head>
       <body className="min-h-screen">
         <main className="flex-1">
